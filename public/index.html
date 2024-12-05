@@ -1,12 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
     <head>
-        <title>WebRTC 기초</title>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>WebRTC 샘플</title>
+        <link rel="stylesheet" href="style.css" />
     </head>
     <body>
-        <video id="localVideo" autoplay playsinline></video>
-        <button id="startButton">카메라 시작</button>
-
+        <div class="container">
+            <video id="localVideo" autoplay playsinline></video>
+            <div class="buttons">
+                <button id="startButton">카메라 시작</button>
+            </div>
+        </div>
+        <script src="/socket.io/socket.io.js"></script>
         <script src="app.js"></script>
     </body>
 </html>
