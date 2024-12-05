@@ -40,6 +40,12 @@ io.on('connection', (socket) => {
         }
     })
 
+    socket.on('user-hangup', () => {
+        console.log('사용자가 연결을 종료함:', socket.id)
+        // 다른 모든 클라이언트에게 연결 종료 알림
+        socket.broadcast.emit('peer-hangup')
+    })
+
     socket.on('disconnect', () => {
         console.log('사용자 연결 해제됨:', socket.id)
         connectedUsers.delete(socket.id)

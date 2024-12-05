@@ -34,6 +34,14 @@ const constraints = {
     },
 }
 
+// 미디어 트랙 정지 함수 추가
+function stopMediaTracks(stream) {
+    if (!stream) return
+    stream.getTracks().forEach((track) => {
+        track.stop()
+    })
+}
+
 // 카메라 시작 함수
 async function startCamera() {
     try {
@@ -94,13 +102,28 @@ async function startCall() {
 
 // 연결 종료
 function hangup() {
+    console.log('연결 종료 시작')
+
+    // 원격 스트림만 정리
+    if (remoteVideo.srcObject) {
+        const remoteStream = remoteVideo.srcObject
+        stopMediaTracks(remoteStream)
+        remoteVideo.pause()
+        remoteVideo.srcObject = null
+    }
+
+    // PeerConnection 정리
     if (peerConnection) {
         peerConnection.close()
         peerConnection = null
     }
-    remoteVideo.srcObject = null
+
+    // 버튼 상태 초기화
     callButton.disabled = false
     hangupButton.disabled = true
+
+    // 연결 종료 신호를 서버에 전송
+    socket.emit('user-hangup')
 }
 
 // 소켓 이벤트 처리 부분 수정
@@ -167,6 +190,29 @@ socket.on('connect', () => {
 
 socket.on('userCount', (count) => {
     console.log('현재 연결된 사용자 수:', count)
+})
+
+// 소켓 이벤트 핸들러 추가
+socket.on('peer-hangup', () => {
+    console.log('상대방이 연결을 종료함')
+
+    // 원격 스트림 정리
+    if (remoteVideo.srcObject) {
+        const remoteStream = remoteVideo.srcObject
+        stopMediaTracks(remoteStream)
+        remoteVideo.pause()
+        remoteVideo.srcObject = null
+    }
+
+    // PeerConnection 정리
+    if (peerConnection) {
+        peerConnection.close()
+        peerConnection = null
+    }
+
+    // 버튼 상태 초기화
+    callButton.disabled = false
+    hangupButton.disabled = true
 })
 
 // 이벤트 리스너
