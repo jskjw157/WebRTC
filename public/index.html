@@ -8,9 +8,20 @@
     </head>
     <body>
         <div class="container">
-            <video id="localVideo" autoplay playsinline></video>
+            <div class="video-container">
+                <div class="video-box">
+                    <h3>로컬 비디오</h3>
+                    <video id="localVideo" autoplay playsinline></video>
+                </div>
+                <div class="video-box">
+                    <h3>원격 비디오</h3>
+                    <video id="remoteVideo" autoplay playsinline></video>
+                </div>
+            </div>
             <div class="buttons">
                 <button id="startButton">카메라 시작</button>
+                <button id="callButton" disabled>연결하기</button>
+                <button id="hangupButton" disabled>종료하기</button>
             </div>
         </div>
         <script src="/socket.io/socket.io.js"></script>
