@@ -23,6 +23,11 @@
                 <button id="callButton" disabled>연결하기</button>
                 <button id="hangupButton" disabled>종료하기</button>
             </div>
+            <div class="chat-container">
+                <div id="chatBox" class="chat-box"></div>
+                <input type="text" id="chatInput" placeholder="메시지를 입력하세요" />
+                <button id="sendButton" disabled>전송</button>
+            </div>
         </div>
         <script src="/socket.io/socket.io.js"></script>
         <script src="app.js"></script>

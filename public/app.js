@@ -55,48 +55,88 @@ async function startCamera() {
     }
 }
 
+let dataChannel
+
 // P2P 연결 시작
 async function startCall() {
     console.log('연결 시작...')
     callButton.disabled = true
     hangupButton.disabled = false
 
-    peerConnection = new RTCPeerConnection(configuration)
-    console.log('PeerConnection 생성됨')
-
-    // 연결 상태 모니터링 추가
-    peerConnection.onconnectionstatechange = (event) => {
-        console.log('연결 상태 변경:', peerConnection.connectionState)
-    }
-
-    // ICE 연결 상태 모니터링 추가
-    peerConnection.oniceconnectionstatechange = (event) => {
-        console.log('ICE 연결 상태:', peerConnection.iceConnectionState)
-    }
-
-    localStream.getTracks().forEach((track) => {
-        peerConnection.addTrack(track, localStream)
-    })
-
-    peerConnection.ontrack = (event) => {
-        console.log('원격 스트림 받음')
-        remoteVideo.srcObject = event.streams[0]
-    }
-
-    peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-            console.log('ICE candidate 발견')
-            socket.emit('ice-candidate', event.candidate)
-        }
-    }
-
     try {
+        if (!peerConnection) {
+            peerConnection = new RTCPeerConnection(configuration)
+            console.log('PeerConnection 생성됨')
+
+            // 데이터 채널 생성
+            dataChannel = peerConnection.createDataChannel('chat')
+            setupDataChannel()
+
+            peerConnection.ondatachannel = (event) => {
+                dataChannel = event.channel
+                setupDataChannel()
+            }
+
+            // 로컬 스트림 추가
+            localStream.getTracks().forEach((track) => {
+                peerConnection.addTrack(track, localStream)
+            })
+
+            // 원격 스트림 처리
+            peerConnection.ontrack = (event) => {
+                console.log('원격 스트림 받음')
+                remoteVideo.srcObject = event.streams[0]
+            }
+
+            // ICE candidate 처리
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log('ICE candidate 발견')
+                    socket.emit('ice-candidate', event.candidate)
+                }
+            }
+        }
+
+        // offer 생성 및 전송
         const offer = await peerConnection.createOffer()
         await peerConnection.setLocalDescription(offer)
         console.log('오퍼 생성 및 전송')
         socket.emit('offer', offer)
     } catch (err) {
-        console.error('오퍼 생성 오류:', err)
+        console.error('연결 시작 오류:', err)
+    }
+}
+
+// 데이터 채널 설정 함수
+function setupDataChannel() {
+    dataChannel.onopen = () => {
+        console.log('데이터 채널 열림')
+        document.getElementById('sendButton').disabled = false
+    }
+
+    dataChannel.onclose = () => {
+        console.log('데이터 채널 닫힘')
+        document.getElementById('sendButton').disabled = true
+    }
+
+    dataChannel.onmessage = (event) => {
+        console.log('메시지 받음:', event.data)
+        const chatBox = document.getElementById('chatBox')
+        chatBox.innerHTML += `<div>상대방: ${event.data}</div>`
+        chatBox.scrollTop = chatBox.scrollHeight
+    }
+}
+
+// 메시지 전송 함수
+function sendMessage() {
+    const chatInput = document.getElementById('chatInput')
+    const message = chatInput.value
+    if (message && dataChannel && dataChannel.readyState === 'open') {
+        dataChannel.send(message)
+        const chatBox = document.getElementById('chatBox')
+        chatBox.innerHTML += `<div>나: ${message}</div>`
+        chatBox.scrollTop = chatBox.scrollHeight
+        chatInput.value = ''
     }
 }
 
@@ -126,42 +166,47 @@ function hangup() {
     socket.emit('user-hangup')
 }
 
-// 소켓 이벤트 처리 부분 수정
+// offer 받았을 때의 처리
 socket.on('offer', async (offer, fromId) => {
-    console.log('오퍼 받음:', fromId)
-    if (!peerConnection) {
-        peerConnection = new RTCPeerConnection(configuration)
+    console.log('오퍼 받음 from:', fromId)
+    try {
+        if (!peerConnection) {
+            peerConnection = new RTCPeerConnection(configuration)
 
-        // 연결 상태 모니터링
-        peerConnection.onconnectionstatechange = (event) => {
-            console.log('연결 상태 변경:', peerConnection.connectionState)
-        }
+            peerConnection.ondatachannel = (event) => {
+                console.log('데이터 채널 받음')
+                dataChannel = event.channel
+                setupDataChannel()
+            }
 
-        localStream.getTracks().forEach((track) => {
-            peerConnection.addTrack(track, localStream)
-        })
+            localStream.getTracks().forEach((track) => {
+                peerConnection.addTrack(track, localStream)
+            })
 
-        peerConnection.ontrack = (event) => {
-            console.log('원격 스트림 받음')
-            remoteVideo.srcObject = event.streams[0]
-        }
+            peerConnection.ontrack = (event) => {
+                console.log('원격 스트림 받음')
+                remoteVideo.srcObject = event.streams[0]
+            }
 
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                console.log('ICE candidate 발견')
-                socket.emit('ice-candidate', event.candidate, fromId)
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log('ICE candidate 발견 (응답측)')
+                    socket.emit('ice-candidate', event.candidate, fromId)
+                }
             }
         }
-    }
 
-    try {
-        await peerConnection.setRemoteDescription(offer)
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
         const answer = await peerConnection.createAnswer()
         await peerConnection.setLocalDescription(answer)
-        console.log('응답 전송:', fromId)
+        console.log('응답 전송 to:', fromId)
         socket.emit('answer', answer, fromId)
+
+        // 응답하는 쪽에서도 버튼 상태 업데이트
+        callButton.disabled = true
+        hangupButton.disabled = false
     } catch (err) {
-        console.error('응답 생성 오류:', err)
+        console.error('오퍼 처리 오류:', err)
     }
 })
 
@@ -219,3 +264,11 @@ socket.on('peer-hangup', () => {
 startButton.addEventListener('click', startCamera)
 callButton.addEventListener('click', startCall)
 hangupButton.addEventListener('click', hangup)
+
+// 이벤트 리스너 추가
+document.getElementById('sendButton').addEventListener('click', sendMessage)
+document.getElementById('chatInput').addEventListener('keypress', (event) => {
+    if (event.key === 'Enter') {
+        sendMessage()
+    }
+})
