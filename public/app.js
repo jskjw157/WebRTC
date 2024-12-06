@@ -25,10 +25,12 @@ const configuration = {
 // 미디어 스트림 제약조건
 const constraints = {
     video: {
+        // 비디오 해상도 제약조건
         width: { min: 640, ideal: 1280, max: 1920 },
         height: { min: 480, ideal: 720, max: 1080 },
     },
     audio: {
+        // 음성 처리 제약조건
         echoCancellation: true,
         noiseSuppression: true,
     },
@@ -45,8 +47,13 @@ function stopMediaTracks(stream) {
 // 카메라 시작 함수
 async function startCamera() {
     try {
+        // 카메라/마이크 스트림 가져오기
         localStream = await navigator.mediaDevices.getUserMedia(constraints)
+
+        // 비디오 요소에 스트림 연결
         localVideo.srcObject = localStream
+
+        // 버튼 상태 업데이트
         startButton.disabled = true
         callButton.disabled = false
     } catch (err) {
